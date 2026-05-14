@@ -17,7 +17,12 @@ async function request(url, options = {}) {
     headers: headers(),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  if (!res.ok) {
+    if (res.status === 503) {
+      throw new Error(data.error || 'AI service unavailable (503). Configure OPENROUTER_API_KEY on the server.');
+    }
+    throw new Error(data.error || 'Request failed');
+  }
   return data;
 }
 
@@ -42,12 +47,13 @@ export const api = {
   aiDiagnose: (body) => request('/diagnostics/ai-diagnose', { method: 'POST', body: JSON.stringify(body) }),
 
   // Medications
-  getMedications: () => request('/medications'),
+  getMedications: (page = 1, limit = 20) => request(`/medications?page=${page}&limit=${limit}`),
   getMedication: (id) => request(`/medications/${id}`),
   createMedication: (body) => request('/medications', { method: 'POST', body: JSON.stringify(body) }),
   updateMedication: (id, body) => request(`/medications/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteMedication: (id) => request(`/medications/${id}`, { method: 'DELETE' }),
   calculateDose: (body) => request('/medications/calculate-dose', { method: 'POST', body: JSON.stringify(body) }),
+  drugInteractionCheck: (body) => request('/medications/drug-interaction-check', { method: 'POST', body: JSON.stringify(body) }),
 
   // Appointments
   getAppointments: () => request('/appointments'),
@@ -102,6 +108,14 @@ export const api = {
   createVisit: (body) => request('/visits', { method: 'POST', body: JSON.stringify(body) }),
   updateVisit: (id, body) => request(`/visits/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteVisit: (id) => request(`/visits/${id}`, { method: 'DELETE' }),
+  generateSoapNote: (id, body) => request(`/visits/${id}/ai-soap-note`, { method: 'POST', body: JSON.stringify(body || {}) }),
+
+  // Patients extras
+  getPatientHealthTimeline: (id) => request(`/patients/${id}/health-timeline`),
+
+  // Vaccination reminders
+  getDueReminders: () => request('/vaccinations/due-reminders'),
+  sendVaccinationReminders: () => request('/vaccinations/send-reminders', { method: 'POST' }),
 
   // Reports
   getReportOverview: () => request('/reports/overview'),
@@ -111,4 +125,16 @@ export const api = {
   getLowStock: () => request('/reports/low-stock'),
   getOverdueVaccinations: () => request('/reports/overdue-vaccinations'),
   getRecentActivity: () => request('/reports/recent-activity'),
+
+  // New AI tools
+  aiDiagnosticAssistant: (body) => request('/ai/diagnostic-assistant', { method: 'POST', body: JSON.stringify(body) }),
+  aiTreatmentRecommendation: (body) => request('/ai/treatment-recommendation', { method: 'POST', body: JSON.stringify(body) }),
+  aiAftercare: (body) => request('/ai/aftercare', { method: 'POST', body: JSON.stringify(body) }),
+  aiWellnessReminder: (body) => request('/ai/wellness-reminder', { method: 'POST', body: JSON.stringify(body) }),
+  // Apply pass 5 backlog
+  aiOutbreakDetection: (body) => request('/ai/outbreak-detection', { method: 'POST', body: JSON.stringify(body) }),
+  aiLabResultInterpret: (body) => request('/ai/lab-result-interpret', { method: 'POST', body: JSON.stringify(body) }),
+  aiPharmacyInteractionCheck: (body) => request('/ai/pharmacy-interaction-check', { method: 'POST', body: JSON.stringify(body) }),
+  aiOwnerSelfServiceFAQ: (body) => request('/ai/owner-self-service-faq', { method: 'POST', body: JSON.stringify(body) }),
+  aiMultiClinicSummary: (body) => request('/ai/multi-clinic-summary', { method: 'POST', body: JSON.stringify(body) }),
 };

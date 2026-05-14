@@ -34,6 +34,17 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { patient_id, vet_name, appointment_date, appointment_time, type, status, notes } = req.body;
+    // Check for conflicts: same vet, same date, overlapping time
+    if (vet_name && appointment_date && appointment_time) {
+      const conflict = await pool.query(
+        `SELECT id FROM appointments WHERE vet_name=$1 AND appointment_date=$2 AND appointment_time=$3 AND status != 'cancelled'`,
+        [vet_name, appointment_date, appointment_time]
+      );
+      if (conflict.rows.length > 0) {
+        return res.status(409).json({ error: 'Appointment conflict: vet already has an appointment at this time', conflicting_id: conflict.rows[0].id });
+      }
+    }
+
     const result = await pool.query(
       `INSERT INTO appointments (patient_id, vet_name, appointment_date, appointment_time, type, status, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,

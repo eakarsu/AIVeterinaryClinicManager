@@ -62,4 +62,25 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Patient health timeline
+router.get('/:id/health-timeline', authenticateToken, async (req, res) => {
+  try {
+    const pid = req.params.id;
+    const [appointments, vaccinations, visits] = await Promise.all([
+      pool.query(`SELECT 'appointment' as type, appointment_date as date, type as subtype, notes as details, status FROM appointments WHERE patient_id = $1 ORDER BY appointment_date DESC`, [pid]),
+      pool.query(`SELECT 'vaccination' as type, administered_date as date, vaccine_name as subtype, vaccine_type as details, status FROM vaccinations WHERE patient_id = $1 ORDER BY administered_date DESC`, [pid]),
+      pool.query(`SELECT 'visit' as type, visit_date as date, visit_type as subtype, examination_notes as details, NULL as status FROM visits WHERE patient_id = $1 ORDER BY visit_date DESC`, [pid]),
+    ]);
+
+    const timeline = [
+      ...appointments.rows,
+      ...vaccinations.rows,
+      ...visits.rows,
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const patient = await pool.query('SELECT * FROM patients WHERE id = $1', [pid]);
+    res.json({ patient: patient.rows[0], timeline, total_events: timeline.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ArrowLeft, Search, Edit, Trash2, ClipboardList } from 'lucide-react';
+import { Plus, ArrowLeft, Search, Edit, Trash2, ClipboardList, Sparkles, FileText } from 'lucide-react';
 import { api } from '../services/api.js';
 
 const visitTypes = [
@@ -39,10 +39,30 @@ export default function Visits() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // SOAP Note AI state
+  const [soapLoading, setSoapLoading] = useState(false);
+  const [soapNote, setSoapNote] = useState(null);
+  const [additionalNotes, setAdditionalNotes] = useState('');
+
   useEffect(() => {
     loadVisits();
     loadPatients();
   }, []);
+
+  const handleGenerateSoap = async () => {
+    setSoapLoading(true);
+    setSoapNote(null);
+    setError('');
+    try {
+      const result = await api.generateSoapNote(selectedItem.id, { additional_notes: additionalNotes });
+      setSoapNote(result);
+      setSuccess('SOAP note generated.');
+    } catch (err) {
+      setError('Failed to generate SOAP: ' + err.message);
+    } finally {
+      setSoapLoading(false);
+    }
+  };
 
   const loadVisits = async () => {
     setLoading(true);
@@ -72,6 +92,15 @@ export default function Visits() {
       setSelectedItem(data);
       setView('detail');
       setError('');
+      setSoapNote(null);
+      setAdditionalNotes('');
+      // Auto-load existing soap_note if present
+      if (data.soap_note) {
+        try {
+          const parsed = typeof data.soap_note === 'string' ? JSON.parse(data.soap_note) : data.soap_note;
+          setSoapNote({ structured: parsed });
+        } catch {}
+      }
     } catch (err) {
       setError('Failed to load visit details: ' + err.message);
     }
@@ -80,6 +109,8 @@ export default function Visits() {
   const handleBackToList = () => {
     setView('list');
     setSelectedItem(null);
+    setSoapNote(null);
+    setAdditionalNotes('');
   };
 
   const openCreateModal = () => {
@@ -274,6 +305,93 @@ export default function Visits() {
                 </div>
               </div>
             </>
+          )}
+        </div>
+
+        {/* AI SOAP Note Generator */}
+        <div className="detail-panel" style={{ marginTop: 16 }}>
+          <div className="detail-header">
+            <h2><FileText size={20} /> AI SOAP Note</h2>
+          </div>
+          <p style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
+            Generate a structured SOAP note (Subjective, Objective, Assessment, Plan) with billing codes from this visit's data.
+          </p>
+
+          <div className="form-group">
+            <label>Additional Notes (optional)</label>
+            <textarea
+              value={additionalNotes}
+              onChange={(e) => setAdditionalNotes(e.target.value)}
+              rows={3}
+              placeholder="Any extra observations to include in the SOAP analysis..."
+            />
+          </div>
+
+          <button className="btn btn-ai" onClick={handleGenerateSoap} disabled={soapLoading}>
+            <Sparkles size={16} /> {soapLoading ? 'Generating SOAP Note...' : 'Generate SOAP Note'}
+          </button>
+
+          {soapNote?.structured && (
+            <div style={{ marginTop: 16 }}>
+              <h3 style={{ color: '#475569' }}>S — Subjective</h3>
+              <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6, marginBottom: 12 }}>
+                <div><strong>Chief Complaint:</strong> {soapNote.structured.subjective?.chief_complaint || '—'}</div>
+                <div><strong>History:</strong> {soapNote.structured.subjective?.history || '—'}</div>
+                <div><strong>Owner Observations:</strong> {soapNote.structured.subjective?.owner_observations || '—'}</div>
+              </div>
+
+              <h3 style={{ color: '#475569' }}>O — Objective</h3>
+              <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6, marginBottom: 12 }}>
+                <div><strong>Weight:</strong> {soapNote.structured.objective?.weight || '—'} kg | <strong>Temp:</strong> {soapNote.structured.objective?.temperature || '—'}°F</div>
+                <div><strong>HR:</strong> {soapNote.structured.objective?.heart_rate || '—'} | <strong>RR:</strong> {soapNote.structured.objective?.respiratory_rate || '—'}</div>
+                <div style={{ marginTop: 8 }}><strong>Findings:</strong> {soapNote.structured.objective?.physical_exam_findings || '—'}</div>
+              </div>
+
+              <h3 style={{ color: '#475569' }}>A — Assessment</h3>
+              <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6, marginBottom: 12 }}>
+                <div><strong>Primary Diagnosis:</strong> {soapNote.structured.assessment?.primary_diagnosis || '—'}</div>
+                <div><strong>Severity:</strong> {soapNote.structured.assessment?.severity || '—'}</div>
+                {soapNote.structured.assessment?.differential_diagnoses?.length > 0 && (
+                  <div><strong>Differentials:</strong>
+                    <ul>{soapNote.structured.assessment.differential_diagnoses.map((d, i) => <li key={i}>{d}</li>)}</ul>
+                  </div>
+                )}
+              </div>
+
+              <h3 style={{ color: '#475569' }}>P — Plan</h3>
+              <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6, marginBottom: 12 }}>
+                {soapNote.structured.plan?.treatments?.length > 0 && (
+                  <div><strong>Treatments:</strong> <ul>{soapNote.structured.plan.treatments.map((t, i) => <li key={i}>{t}</li>)}</ul></div>
+                )}
+                {soapNote.structured.plan?.medications?.length > 0 && (
+                  <div><strong>Medications:</strong> <ul>{soapNote.structured.plan.medications.map((t, i) => <li key={i}>{t}</li>)}</ul></div>
+                )}
+                {soapNote.structured.plan?.diagnostics_ordered?.length > 0 && (
+                  <div><strong>Diagnostics Ordered:</strong> <ul>{soapNote.structured.plan.diagnostics_ordered.map((t, i) => <li key={i}>{t}</li>)}</ul></div>
+                )}
+                {soapNote.structured.plan?.client_education?.length > 0 && (
+                  <div><strong>Client Education:</strong> <ul>{soapNote.structured.plan.client_education.map((t, i) => <li key={i}>{t}</li>)}</ul></div>
+                )}
+                <div><strong>Follow-up:</strong> {soapNote.structured.plan?.follow_up || '—'}</div>
+              </div>
+
+              {soapNote.structured.billing_codes?.length > 0 && (
+                <div>
+                  <h3 style={{ color: '#475569' }}>Billing Codes</h3>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {soapNote.structured.billing_codes.map((c, i) => (
+                      <span key={i} style={{ padding: '4px 10px', background: '#dbeafe', color: '#1e40af', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>{c}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {soapNote?.soap_note && !soapNote?.structured && (
+            <div style={{ marginTop: 16, padding: 12, background: '#f8fafc', borderRadius: 6, whiteSpace: 'pre-wrap' }}>
+              {soapNote.soap_note}
+            </div>
           )}
         </div>
       </div>

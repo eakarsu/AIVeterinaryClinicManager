@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ArrowLeft, Search, Edit, Trash2, Sparkles, Calculator } from 'lucide-react';
+import { Plus, ArrowLeft, Search, Edit, Trash2, Sparkles, Calculator, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../services/api.js';
 import AIResponse from '../components/AIResponse.jsx';
 
@@ -32,24 +32,76 @@ export default function Medications({ onNavigate }) {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+
   // AI Dose Calculator state
   const [doseForm, setDoseForm] = useState(emptyDoseForm);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  // Drug Interaction Checker state
+  const [showInteractionModal, setShowInteractionModal] = useState(false);
+  const [interactionMedIds, setInteractionMedIds] = useState([]);
+  const [interactionSpecies, setInteractionSpecies] = useState('dog');
+  const [interactionLoading, setInteractionLoading] = useState(false);
+  const [interactionResult, setInteractionResult] = useState(null);
+
   useEffect(() => {
     loadMedications();
-  }, []);
+  }, [page]);
 
   const loadMedications = async () => {
     try {
       setLoading(true);
-      const data = await api.getMedications();
-      setItems(data);
+      const resp = await api.getMedications(page, 20);
+      // Handles both paginated and array responses
+      if (Array.isArray(resp)) {
+        setItems(resp);
+        setTotalPages(1);
+        setTotalCount(resp.length);
+      } else {
+        setItems(resp.data || []);
+        setTotalPages(resp.pagination?.totalPages || 1);
+        setTotalCount(resp.pagination?.total || 0);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openInteractionModal = () => {
+    setShowInteractionModal(true);
+    setInteractionMedIds([]);
+    setInteractionResult(null);
+    setError('');
+  };
+
+  const toggleInteractionMed = (id) => {
+    setInteractionMedIds((prev) => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleRunInteractionCheck = async () => {
+    if (interactionMedIds.length < 2) {
+      setError('Select at least 2 medications');
+      return;
+    }
+    setInteractionLoading(true);
+    setInteractionResult(null);
+    try {
+      const result = await api.drugInteractionCheck({
+        medication_ids: interactionMedIds,
+        species: interactionSpecies,
+      });
+      setInteractionResult(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setInteractionLoading(false);
     }
   };
 
@@ -174,6 +226,9 @@ export default function Medications({ onNavigate }) {
         <div className="page-header">
           <h1>Medications</h1>
           <div className="header-actions">
+            <button className="btn btn-secondary" onClick={openInteractionModal}>
+              <AlertTriangle size={16} /> Drug Interaction Check
+            </button>
             <button className="btn btn-primary" onClick={handleNewMedication}>
               <Plus size={16} /> New Medication
             </button>
@@ -223,7 +278,24 @@ export default function Medications({ onNavigate }) {
           </table>
         </div>
 
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+            <span style={{ fontSize: 13, color: '#64748b' }}>
+              Showing page {page} of {totalPages} ({totalCount} total)
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-sm btn-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                <ChevronLeft size={14} /> Previous
+              </button>
+              <button className="btn btn-sm btn-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {showModal && renderModal()}
+        {showInteractionModal && renderInteractionModal()}
       </div>
     );
   }
@@ -344,6 +416,110 @@ export default function Medications({ onNavigate }) {
         </div>
 
         {showModal && renderModal()}
+        {showInteractionModal && renderInteractionModal()}
+      </div>
+    );
+  }
+
+  // ---------- DRUG INTERACTION MODAL ----------
+  function renderInteractionModal() {
+    return (
+      <div className="modal-overlay" onClick={() => setShowInteractionModal(false)}>
+        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+          <h2><AlertTriangle size={20} /> Drug Interaction Check</h2>
+          {error && <div className="alert-error">{error}</div>}
+          <p style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
+            Select 2 or more medications to check for dangerous interactions for a given species.
+          </p>
+          <div className="form-group">
+            <label>Species</label>
+            <select value={interactionSpecies} onChange={(e) => setInteractionSpecies(e.target.value)}>
+              <option value="dog">Dog</option>
+              <option value="cat">Cat</option>
+              <option value="horse">Horse</option>
+              <option value="rabbit">Rabbit</option>
+              <option value="bird">Bird</option>
+              <option value="reptile">Reptile</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Medications ({interactionMedIds.length} selected)</label>
+            <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 6, padding: 8 }}>
+              {items.map((m) => (
+                <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 4, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={interactionMedIds.includes(m.id)}
+                    onChange={() => toggleInteractionMed(m.id)}
+                  />
+                  <span><strong>{m.name}</strong> <span style={{ color: '#94a3b8', fontSize: 12 }}>({m.category || 'unknown'})</span></span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <button
+            className="btn btn-ai"
+            onClick={handleRunInteractionCheck}
+            disabled={interactionLoading || interactionMedIds.length < 2}
+          >
+            <Sparkles size={16} /> {interactionLoading ? 'Checking...' : 'Run Interaction Check'}
+          </button>
+
+          {interactionResult && (
+            <div style={{ marginTop: 16 }}>
+              {interactionResult.structured ? (
+                <div>
+                  <div style={{
+                    padding: 12,
+                    borderRadius: 6,
+                    background: interactionResult.structured.safe_to_prescribe ? '#dcfce7' : '#fee2e2',
+                    color: interactionResult.structured.safe_to_prescribe ? '#166534' : '#991b1b',
+                    marginBottom: 12,
+                    fontWeight: 600,
+                  }}>
+                    {interactionResult.structured.safe_to_prescribe ? 'SAFE to prescribe together' : 'INTERACTIONS DETECTED — review carefully'}
+                  </div>
+
+                  {interactionResult.structured.interactions?.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <h4>Interactions Found</h4>
+                      {interactionResult.structured.interactions.map((i, idx) => (
+                        <div key={idx} style={{ padding: 10, marginBottom: 8, border: '1px solid #fca5a5', borderRadius: 6, background: '#fef2f2' }}>
+                          <div style={{ fontWeight: 600 }}>{i.drug1} + {i.drug2}</div>
+                          <div style={{ fontSize: 12, color: '#991b1b', textTransform: 'uppercase' }}>Severity: {i.severity}</div>
+                          <div style={{ marginTop: 6, fontSize: 13 }}><strong>Mechanism:</strong> {i.mechanism}</div>
+                          <div style={{ marginTop: 4, fontSize: 13 }}><strong>Management:</strong> {i.management}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {interactionResult.structured.warnings?.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <h4>Warnings</h4>
+                      <ul>{interactionResult.structured.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+                    </div>
+                  )}
+
+                  {interactionResult.structured.monitoring_required?.length > 0 && (
+                    <div>
+                      <h4>Monitoring Required</h4>
+                      <ul>{interactionResult.structured.monitoring_required.map((w, i) => <li key={i}>{w}</li>)}</ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <AIResponse title="Interaction Analysis" content={interactionResult.result} />
+              )}
+            </div>
+          )}
+
+          <div className="modal-actions">
+            <button type="button" className="btn btn-secondary" onClick={() => setShowInteractionModal(false)}>
+              Close
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

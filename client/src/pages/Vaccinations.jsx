@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ArrowLeft, Search, Edit, Trash2, Syringe, AlertTriangle } from 'lucide-react';
+import { Plus, ArrowLeft, Search, Edit, Trash2, Syringe, AlertTriangle, Mail, Bell } from 'lucide-react';
 import { api } from '../services/api.js';
 
 const vaccineTypes = ['Core', 'Non-core', 'Required by law'];
@@ -31,10 +31,45 @@ export default function Vaccinations() {
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
 
+  // Reminder Engine
+  const [showRemindersModal, setShowRemindersModal] = useState(false);
+  const [reminders, setReminders] = useState(null);
+  const [remindersLoading, setRemindersLoading] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
+
   useEffect(() => {
     loadVaccinations();
     loadPatients();
   }, []);
+
+  const openRemindersModal = async () => {
+    setShowRemindersModal(true);
+    setRemindersLoading(true);
+    setReminders(null);
+    try {
+      const data = await api.getDueReminders();
+      setReminders(data);
+    } catch (err) {
+      setError('Failed to load reminders: ' + err.message);
+    } finally {
+      setRemindersLoading(false);
+    }
+  };
+
+  const handleSendReminders = async () => {
+    if (!window.confirm('Send vaccination reminder emails to all owners with upcoming doses?')) return;
+    setSendingReminders(true);
+    try {
+      const result = await api.sendVaccinationReminders();
+      setSuccess(`Sent ${result.sent} reminder${result.sent !== 1 ? 's' : ''}.${result.errors.length ? ' ' + result.errors.length + ' failed.' : ''}`);
+      await loadVaccinations();
+      await openRemindersModal();
+    } catch (err) {
+      setError('Failed to send reminders: ' + err.message);
+    } finally {
+      setSendingReminders(false);
+    }
+  };
 
   const loadVaccinations = async () => {
     setLoading(true);
@@ -260,6 +295,9 @@ export default function Vaccinations() {
       <div className="page-header">
         <h1>Vaccination Tracker</h1>
         <div className="header-actions">
+          <button className="btn btn-secondary" onClick={openRemindersModal}>
+            <Bell size={18} /> Reminder Engine
+          </button>
           <button className="btn btn-success" onClick={openCreateModal}>
             <Plus size={18} /> New Vaccination
           </button>
@@ -341,6 +379,65 @@ export default function Vaccinations() {
           </tbody>
         </table>
       </div>
+
+      {showRemindersModal && (
+        <div className="modal-overlay" onClick={() => setShowRemindersModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+            <h2><Bell size={20} /> Vaccination Reminder Engine</h2>
+            <p style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
+              Patients with vaccinations due within the next 30 days, grouped by patient/owner.
+            </p>
+
+            {remindersLoading && <div>Loading...</div>}
+
+            {reminders && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <span><strong>{reminders.total_due}</strong> vaccinations due across <strong>{reminders.reminders.length}</strong> patient{reminders.reminders.length !== 1 ? 's' : ''}.</span>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handleSendReminders}
+                    disabled={sendingReminders || reminders.total_due === 0}
+                  >
+                    <Mail size={14} /> {sendingReminders ? 'Sending...' : 'Send All Reminders'}
+                  </button>
+                </div>
+
+                {reminders.reminders.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>No upcoming vaccinations.</div>
+                ) : (
+                  <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                    {reminders.reminders.map((r, idx) => (
+                      <div key={idx} style={{ padding: 12, marginBottom: 8, border: '1px solid #e5e7eb', borderRadius: 6 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <strong>{r.patient_name}</strong> <span style={{ color: '#64748b', fontSize: 13 }}>({r.species})</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+                          Owner: {r.owner_name || '—'} {r.owner_email ? '(' + r.owner_email + ')' : ''}
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13 }}>
+                          {r.vaccinations.map((v, i) => (
+                            <li key={i}>
+                              <strong>{v.vaccine_name}</strong> ({v.vaccine_type}) — due {new Date(v.next_due_date).toLocaleDateString()}
+                              <span style={{ marginLeft: 8, color: v.days_until_due < 7 ? '#dc2626' : '#0f766e' }}>
+                                ({v.days_until_due} day{v.days_until_due !== 1 ? 's' : ''})
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowRemindersModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
