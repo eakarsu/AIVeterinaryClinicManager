@@ -81,17 +81,17 @@ async function initDb() {
 initDb().then(() => {
   app.use('/api/diagnostic-assistant', _b8___routes_diagnosticAssistant_js); app.use('/api/treatment-recommendation', _b8___routes_treatmentRecommendation_js); app.use('/api/aftercare-generator', _b8___routes_aftercareGenerator_js); app.use('/api/outbreak-detection', _b8___routes_outbreakDetection_js); app.use('/api/wellness-reminders', _b8___routes_wellnessReminders_js); app.use('/api/boarding-grooming', _b8___routes_boardingGrooming_js);
 
-// === Batch 08 Gaps & Frontend Mounts ===
-app.use('/api/gap-no-diagnostic-assistance-ai', require('./routes/gapNoDiagnosticAssistanceAi'));
-app.use('/api/gap-no-treatment-recommendation-ai', require('./routes/gapNoTreatmentRecommendationAi'));
-app.use('/api/gap-no-discharge-aftercare-instruction-generator', require('./routes/gapNoDischargeAftercareInstructionGenerator'));
-app.use('/api/gap-no-imaging-analysis-x-ray-ultrasound', require('./routes/gapNoImagingAnalysisXRayUltrasound'));
-app.use('/api/gap-limited-pharmacy-system-integration-only-stub-modules', require('./routes/gapLimitedPharmacySystemIntegrationOnlyStubModules'));
-app.use('/api/gap-no-lab-result-direct-integration-idexx-antech', require('./routes/gapNoLabResultDirectIntegrationIdexxAntech'));
-app.use('/api/gap-no-pet-owner-self-service-portal', require('./routes/gapNoPetOwnerSelfServicePortal'));
-app.use('/api/gap-no-multi-clinic-hospital-group-support', require('./routes/gapNoMultiClinicHospitalGroupSupport'));
-app.use('/api/gap-no-webhooks-for-appointment-events', require('./routes/gapNoWebhooksForAppointmentEvents'));
-app.use('/api/gap-no-notifications-subsystem-despite-sms-email-being-mentioned', require('./routes/gapNoNotificationsSubsystemDespiteSmsEmailBeingMentioned'));
+// === Batch 08 Gaps disabled: CommonJS modules incompatible with ESM project ===
+// app.use('/api/gap-no-diagnostic-assistance-ai', require('./routes/gapNoDiagnosticAssistanceAi'));
+// app.use('/api/gap-no-treatment-recommendation-ai', require('./routes/gapNoTreatmentRecommendationAi'));
+// app.use('/api/gap-no-discharge-aftercare-instruction-generator', require('./routes/gapNoDischargeAftercareInstructionGenerator'));
+// app.use('/api/gap-no-imaging-analysis-x-ray-ultrasound', require('./routes/gapNoImagingAnalysisXRayUltrasound'));
+// app.use('/api/gap-limited-pharmacy-system-integration-only-stub-modules', require('./routes/gapLimitedPharmacySystemIntegrationOnlyStubModules'));
+// app.use('/api/gap-no-lab-result-direct-integration-idexx-antech', require('./routes/gapNoLabResultDirectIntegrationIdexxAntech'));
+// app.use('/api/gap-no-pet-owner-self-service-portal', require('./routes/gapNoPetOwnerSelfServicePortal'));
+// app.use('/api/gap-no-multi-clinic-hospital-group-support', require('./routes/gapNoMultiClinicHospitalGroupSupport'));
+// app.use('/api/gap-no-webhooks-for-appointment-events', require('./routes/gapNoWebhooksForAppointmentEvents'));
+// app.use('/api/gap-no-notifications-subsystem-despite-sms-email-being-mentioned', require('./routes/gapNoNotificationsSubsystemDespiteSmsEmailBeingMentioned'));
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

@@ -23,6 +23,11 @@ import AILabResultInterpret from './pages/AILabResultInterpret.jsx';
 import AIPharmacyInteractionCheck from './pages/AIPharmacyInteractionCheck.jsx';
 import AIOwnerSelfServiceFAQ from './pages/AIOwnerSelfServiceFAQ.jsx';
 import AIMultiClinicSummary from './pages/AIMultiClinicSummary.jsx';
+import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
+import CodexOperationsFeature from './pages/CodexOperationsFeature';
+
+import TimelineView from './pages/TimelineView';
+
 // === Batch 08 Gaps & Frontend Mounts ===
 import CfDiagnosticAssistantProvidingDifferentialDiagnosesFromSymptoms from './pages/CfDiagnosticAssistantProvidingDifferentialDiagnosesFromSymptoms'
 import CfTreatmentRecommendationSuggestingEvidenceBasedProtocols from './pages/CfTreatmentRecommendationSuggestingEvidenceBasedProtocols'
@@ -81,6 +86,10 @@ export default function App() {
       <Sidebar user={user} onLogout={handleLogout} currentPath={location.pathname} onNavigate={(path) => navigate(path)} />
       <main className="main-content">
         <Routes>
+        <Route path="/insights/timeline" element={<ProtectedRoute><TimelineView /></ProtectedRoute>} />
+        <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
+        <Route path="/codex/operations" element={<CodexOperationsFeature />} />
+
           <Route path="/dashboard" element={<Dashboard onNavigate={(path) => navigate(path)} />} />
           <Route path="/patients" element={<Patients />} />
           <Route path="/diagnostics" element={<Diagnostics />} />

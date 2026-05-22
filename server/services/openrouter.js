@@ -6,7 +6,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '..', '..', '.env') });
 
-const MODEL = 'anthropic/claude-3-5-sonnet-20241022';
+function getModel() {
+  return process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
+}
 
 export function parseAIJson(text) {
   if (!text) return null;
@@ -32,7 +34,7 @@ export async function queryAI(systemPrompt, userPrompt, returnJson = false) {
       'X-Title': 'AI Veterinary Clinic Manager',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: getModel(),
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
