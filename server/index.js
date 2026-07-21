@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import pool from './db.js';
+import { authenticateToken } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,6 +30,7 @@ import _b8___routes_aftercareGenerator_js from './routes/aftercareGenerator.js';
 import _b8___routes_outbreakDetection_js from './routes/outbreakDetection.js';
 import _b8___routes_wellnessReminders_js from './routes/wellnessReminders.js';
 import _b8___routes_boardingGrooming_js from './routes/boardingGrooming.js';
+import careWorkflowRoutes from './routes/careWorkflow.js';
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 4000;
@@ -40,8 +42,12 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Routes
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.use('/api/auth', authRoutes);
+app.use('/api', authenticateToken);
+app.use('/api/care-workflow', careWorkflowRoutes);
+app.use(/^\/api\/(?:ai(?:\/|$)|gap-|integrations?(?:\/|$)|webhooks?(?:\/|$)|diagnostic-assistant|treatment-recommendation|aftercare-generator|outbreak-detection|wellness-reminders|boarding-grooming)/, (_req,res)=>res.status(503).json({error:'generated/direct-provider clinical endpoints are quarantined; use the non-diagnostic care workflow'}));
+// Routes
 app.use('/api/patients', patientRoutes);
 app.use('/api/diagnostics', diagnosticRoutes);
 app.use('/api/medications', medicationRoutes);
@@ -55,30 +61,8 @@ app.use('/api/visits', visitRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/ai', aiRoutes);
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Initialize ai_results table
-async function initDb() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS ai_results (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER,
-        endpoint VARCHAR(100),
-        input_data JSONB,
-        result JSONB,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    console.log('ai_results table ready');
-  } catch (err) {
-    console.error('DB init error:', err.message);
-  }
-}
-
-initDb().then(() => {
+async function verifySchema(){const ready=await pool.query("SELECT to_regclass('public.care_workflows') AS workflow, to_regclass('public.care_workflow_audit') AS audit");if(!ready.rows[0].workflow||!ready.rows[0].audit)throw new Error('database migrations are pending; run npm run migrate');}
+verifySchema().then(() => {
   app.use('/api/diagnostic-assistant', _b8___routes_diagnosticAssistant_js); app.use('/api/treatment-recommendation', _b8___routes_treatmentRecommendation_js); app.use('/api/aftercare-generator', _b8___routes_aftercareGenerator_js); app.use('/api/outbreak-detection', _b8___routes_outbreakDetection_js); app.use('/api/wellness-reminders', _b8___routes_wellnessReminders_js); app.use('/api/boarding-grooming', _b8___routes_boardingGrooming_js);
 
 // === Batch 08 Gaps disabled: CommonJS modules incompatible with ESM project ===
@@ -96,4 +80,4 @@ initDb().then(() => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
-});
+}).catch((error)=>{console.error('[startup] schema readiness failed:',error.message);process.exit(1);});

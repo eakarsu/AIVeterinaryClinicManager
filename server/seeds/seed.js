@@ -10,6 +10,7 @@ dotenv.config({ path: join(__dirname, '..', '..', '.env') });
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
+if(process.env.ALLOW_DESTRUCTIVE_DEMO_SEED!=='true'){console.error('Refusing destructive demo seed; set ALLOW_DESTRUCTIVE_DEMO_SEED=true only for an isolated disposable database.');process.exit(2);}
 async function seed() {
   const client = await pool.connect();
   try {
@@ -30,12 +31,16 @@ async function seed() {
 
     // Create tables
     await client.query(`
+      CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
       CREATE TABLE users (
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         name VARCHAR(255) NOT NULL,
         role VARCHAR(50) DEFAULT 'staff',
+        tenant_id TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+        patient_id TEXT NOT NULL DEFAULT gen_random_uuid()::text,
         created_at TIMESTAMP DEFAULT NOW()
       );
 
@@ -185,7 +190,11 @@ async function seed() {
     `);
 
     // Seed users
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    const demoPassword = process.env.DEMO_PASSWORD || process.env.SEED_DEMO_PASSWORD;
+    if (!demoPassword || demoPassword.length < 12) {
+      throw new Error('An explicit 12+ character demo password is required');
+    }
+    const hashedPassword = await bcrypt.hash(demoPassword, 10);
     await client.query(`
       INSERT INTO users (email, password, name, role) VALUES
       ('admin@vetclinic.com', $1, 'Dr. Sarah Johnson', 'admin'),
