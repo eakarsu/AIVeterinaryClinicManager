@@ -7,12 +7,10 @@ import pool from '../db.js';
 const router = express.Router();
 
 async function persist(userId, endpoint, inputData, result) {
-  try {
-    await pool.query(
-      'INSERT INTO ai_results (user_id, endpoint, input_data, result) VALUES ($1, $2, $3, $4)',
-      [userId, endpoint, JSON.stringify(inputData), JSON.stringify(result)]
-    );
-  } catch (e) { console.error('persist ai_results failed:', e.message); }
+  await pool.query(
+    'INSERT INTO ai_results (user_id, endpoint, input_data, result) VALUES ($1, $2, $3, $4)',
+    [userId, endpoint, JSON.stringify(inputData), JSON.stringify(result)]
+  );
 }
 
 // POST /api/ai/diagnostic-assistant — differential diagnoses from symptoms/labs

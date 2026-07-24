@@ -24,12 +24,6 @@ import vaccinationRoutes from './routes/vaccinations.js';
 import visitRoutes from './routes/visits.js';
 import reportRoutes from './routes/reports.js';
 import aiRoutes from './routes/ai.js';
-import _b8___routes_diagnosticAssistant_js from './routes/diagnosticAssistant.js';
-import _b8___routes_treatmentRecommendation_js from './routes/treatmentRecommendation.js';
-import _b8___routes_aftercareGenerator_js from './routes/aftercareGenerator.js';
-import _b8___routes_outbreakDetection_js from './routes/outbreakDetection.js';
-import _b8___routes_wellnessReminders_js from './routes/wellnessReminders.js';
-import _b8___routes_boardingGrooming_js from './routes/boardingGrooming.js';
 import careWorkflowRoutes from './routes/careWorkflow.js';
 
 const app = express();
@@ -46,7 +40,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Dat
 app.use('/api/auth', authRoutes);
 app.use('/api', authenticateToken);
 app.use('/api/care-workflow', careWorkflowRoutes);
-app.use(/^\/api\/(?:ai(?:\/|$)|gap-|integrations?(?:\/|$)|webhooks?(?:\/|$)|diagnostic-assistant|treatment-recommendation|aftercare-generator|outbreak-detection|wellness-reminders|boarding-grooming)/, (_req,res)=>res.status(503).json({error:'generated/direct-provider clinical endpoints are quarantined; use the non-diagnostic care workflow'}));
+app.use(/^\/api\/(?:gap-|integrations?(?:\/|$)|webhooks?(?:\/|$)|diagnostic-assistant|treatment-recommendation|aftercare-generator|outbreak-detection|wellness-reminders|boarding-grooming)/, (_req,res)=>res.status(503).json({error:'generated/direct-provider clinical endpoints are quarantined; use the non-diagnostic care workflow'}));
 // Routes
 app.use('/api/patients', patientRoutes);
 app.use('/api/diagnostics', diagnosticRoutes);
@@ -63,8 +57,6 @@ app.use('/api/ai', aiRoutes);
 
 async function verifySchema(){const ready=await pool.query("SELECT to_regclass('public.care_workflows') AS workflow, to_regclass('public.care_workflow_audit') AS audit");if(!ready.rows[0].workflow||!ready.rows[0].audit)throw new Error('database migrations are pending; run npm run migrate');}
 verifySchema().then(() => {
-  app.use('/api/diagnostic-assistant', _b8___routes_diagnosticAssistant_js); app.use('/api/treatment-recommendation', _b8___routes_treatmentRecommendation_js); app.use('/api/aftercare-generator', _b8___routes_aftercareGenerator_js); app.use('/api/outbreak-detection', _b8___routes_outbreakDetection_js); app.use('/api/wellness-reminders', _b8___routes_wellnessReminders_js); app.use('/api/boarding-grooming', _b8___routes_boardingGrooming_js);
-
 // === Batch 08 Gaps disabled: CommonJS modules incompatible with ESM project ===
 // app.use('/api/gap-no-diagnostic-assistance-ai', require('./routes/gapNoDiagnosticAssistanceAi'));
 // app.use('/api/gap-no-treatment-recommendation-ai', require('./routes/gapNoTreatmentRecommendationAi'));

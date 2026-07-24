@@ -7,7 +7,20 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '..', '..', '.env') });
 
 function getModel() {
-  return process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
+  const model = process.env.OPENROUTER_MODEL?.trim();
+  if (!model) throw new Error('OPENROUTER_MODEL is required');
+  return model;
+}
+
+function getConfiguration() {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  const baseUrl = process.env.OPENROUTER_BASE_URL?.trim().replace(/\/$/, '');
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
+  if (!baseUrl) throw new Error('OPENROUTER_BASE_URL is required');
+  if (baseUrl !== 'https://openrouter.ai/api/v1') {
+    throw new Error('OPENROUTER_BASE_URL must be https://openrouter.ai/api/v1');
+  }
+  return { apiKey, baseUrl, model: getModel() };
 }
 
 export function parseAIJson(text) {
@@ -25,16 +38,17 @@ export function parseAIJson(text) {
 }
 
 export async function queryAI(systemPrompt, userPrompt, returnJson = false) {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const { apiKey, baseUrl, model } = getConfiguration();
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': process.env.CLIENT_URL || 'http://localhost:3000',
       'X-Title': 'AI Veterinary Clinic Manager',
     },
     body: JSON.stringify({
-      model: getModel(),
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -44,10 +58,13 @@ export async function queryAI(systemPrompt, userPrompt, returnJson = false) {
     }),
   });
 
-  const data = await response.json();
-  if (data.error) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.error) {
     throw new Error(data.error.message || 'OpenRouter API error');
   }
-  const content = data.choices?.[0]?.message?.content || 'No response from AI';
-  return { text: content, parsed: parseAIJson(content), model: data.model, usage: data.usage };
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new Error('OpenRouter returned an empty response');
+  }
+  return { text: content, parsed: parseAIJson(content), model: data.model || model, usage: data.usage };
 }
