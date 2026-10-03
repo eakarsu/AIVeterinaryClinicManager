@@ -34,7 +34,9 @@ export default function Diagnostics({ onNavigate }) {
   const loadItems = async () => {
     try {
       const data = await api.getDiagnostics();
-      setItems(data);
+      const diagnostics = Array.isArray(data) ? data : data?.data;
+      if (!Array.isArray(diagnostics)) throw new Error('Invalid diagnostics response');
+      setItems(diagnostics);
     } catch (err) {
       setError('Failed to load diagnostics');
     }
